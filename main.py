@@ -5,7 +5,7 @@ from dash import Dash, dcc, html, Input, Output
 # --- 1. Load the Data ---
 # Load your uploaded CSV file
 try:
-    df = pd.read_csv("blood_count_dataset.csv")
+    df = pd.read_csv("data/blood_count_dataset.csv")
 except FileNotFoundError:
     print("Error: 'blood_count_dataset.csv' not found. Please ensure it is in the same directory.")
     exit()
