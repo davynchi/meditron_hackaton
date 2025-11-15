@@ -10,11 +10,24 @@ except FileNotFoundError:
     print("Error: 'blood_count_dataset.csv' not found. Please ensure it is in the same directory.")
     exit()
 
+df = df.reset_index(drop=True)
+
+# Build dropdown-friendly client labels so the UI can reference individual records
+client_options = [
+    {
+        'label': f"Client {idx + 1} | {row['Gender']} | Age {row['Age']}",
+        'value': idx
+    }
+    for idx, row in df.reset_index(drop=True).iterrows()
+]
+
 # List of numerical columns for the dropdown selection
 numerical_cols = [
     'Hemoglobin', 'Platelet_Count', 'White_Blood_Cells',
     'Red_Blood_Cells', 'MCV', 'MCH', 'MCHC'
 ]
+
+stat_columns = ['Age', 'Gender'] + numerical_cols
 
 # --- 2. Initialize the Dash App ---
 app = Dash(__name__)
@@ -64,6 +77,26 @@ app.layout = html.Div(style={'backgroundColor': '#f5f5f5', 'padding': '20px'}, c
                 children=[
                     dcc.Graph(id='gender-box-plot', style={'height': '450px'})
                 ]
+            )
+        ]
+    ),
+
+    # Middle Row for Client Selection
+    html.Div(
+        className='row',
+        style={'padding': '20px', 'backgroundColor': 'white', 'borderRadius': '8px', 'boxShadow': '2px 2px 10px #aaaaaa', 'marginBottom': '20px'},
+        children=[
+            html.H3("Client Statistics", style={'textAlign': 'center', 'color': '#d62728'}),
+            dcc.Dropdown(
+                id='client-dropdown',
+                options=client_options,
+                value=client_options[0]['value'] if client_options else None,
+                placeholder='Select a client record',
+                style={'marginTop': '10px', 'marginBottom': '20px'}
+            ),
+            html.Div(
+                id='client-statistics',
+                style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '15px', 'justifyContent': 'center'}
             )
         ]
     ),
@@ -122,6 +155,46 @@ def update_box_plot(selected_parameter):
         showlegend=False
     )
     return fig
+
+
+@app.callback(
+    Output('client-statistics', 'children'),
+    [Input('client-dropdown', 'value')]
+)
+def update_client_statistics(selected_client):
+    """Show a card-based summary for the selected client."""
+    if selected_client is None or selected_client not in df.index:
+        return html.P('Select a client to view detailed statistics.', style={'color': '#555555'})
+
+    client_data = df.loc[selected_client]
+    cards = []
+    card_style = {
+        'border': '1px solid #e0e0e0',
+        'borderRadius': '8px',
+        'padding': '15px',
+        'width': '150px',
+        'textAlign': 'center',
+        'backgroundColor': '#fafafa',
+        'boxShadow': '1px 1px 5px #dddddd'
+    }
+
+    for column in stat_columns:
+        value = client_data[column]
+        if pd.isna(value):
+            value_display = 'N/A'
+        elif isinstance(value, float):
+            value_display = f"{value:.2f}"
+        else:
+            value_display = str(value)
+
+        cards.append(
+            html.Div([
+                html.H5(column.replace('_', ' '), style={'marginBottom': '5px', 'color': '#333333'}),
+                html.P(value_display, style={'color': '#1f77b4', 'fontWeight': 'bold', 'margin': 0})
+            ], style=card_style)
+        )
+
+    return cards
 
 # --- 5. Run the Application ---
 if __name__ == '__main__':
