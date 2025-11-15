@@ -4,6 +4,9 @@ import io
 import pandas as pd
 import plotly.express as px
 from dash import Dash, dcc, html, Input, Output, State, no_update
+from datetime import datetime
+import plotly.io as pio
+from weasyprint import HTML
 
 # --- 1. Data helpers ---
 
@@ -69,6 +72,7 @@ app.layout = html.Div(
     children=[
         dcc.Store(id='auth-store', data={'authorized': False}),
         dcc.Store(id='data-store', data=None),
+        dcc.Download(id="download-pdf"),
 
         # Registration/Login Block
         html.Div(
