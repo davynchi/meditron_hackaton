@@ -1,6 +1,6 @@
 import pandas as pd
 import plotly.express as px
-from dash import dcc, html, Input, Output
+from dash import dcc, html, Input, Output, State, ALL, no_update, ctx
 
 
 CARD_STYLE = {
@@ -53,10 +53,15 @@ def build_patient_result_sections(patient_df: pd.DataFrame, source_column_map):
             if column not in subset.columns:
                 continue
             cards.append(
-                html.Div([
-                    html.H5(column.replace('_', ' '), style={'marginBottom': '4px', 'color': '#7f3f00'}),
-                    html.P(format_value(record[column]), style={'color': '#1f77b4', 'fontWeight': 'bold', 'margin': 0})
-                ], style=CARD_STYLE)
+                html.Button(
+                    html.Div([
+                        html.H5(column.replace('_', ' '), style={'marginBottom': '4px', 'color': '#7f3f00'}),
+                        html.P(format_value(record[column]), style={'color': '#1f77b4', 'fontWeight': 'bold', 'margin': 0})
+                    ], style=CARD_STYLE),
+                    id={'type': 'metric-card', 'metric': column},
+                    n_clicks=0,
+                    style={'background': 'transparent', 'border': 'none', 'padding': 0, 'cursor': 'pointer'}
+                )
             )
 
         sections.append(
@@ -81,21 +86,51 @@ def build_patient_result_sections(patient_df: pd.DataFrame, source_column_map):
     )
 
 
-def build_dashboard_container(patient_options, blood_parameter_options, default_parameter, global_scatter_fig):
+def build_dashboard_container(patient_options, global_scatter_fig):
     return html.Div(
         id='dashboard-container',
         style={'display': 'none'},
         children=[
             html.Div(
-                style={'marginBottom': '20px', 'backgroundColor': 'white', 'padding': '20px', 'borderRadius': '10px', 'boxShadow': '2px 2px 10px #aaaaaa'},
+                style={
+                    'marginBottom': '20px',
+                    'backgroundColor': 'white',
+                    'padding': '20px',
+                    'borderRadius': '10px',
+                    'boxShadow': '2px 2px 10px #aaaaaa',
+                    'display': 'flex',
+                    'flexWrap': 'wrap',
+                    'gap': '20px',
+                    'alignItems': 'center',
+                    'justifyContent': 'space-between'
+                },
                 children=[
-                    html.H2('Выберите пациента', style={'color': '#1f77b4'}),
-                    dcc.Dropdown(
-                        id='patient-dropdown',
-                        options=patient_options,
-                        placeholder='Выберите уникальную комбинацию возраста и пола',
-                        value=None,
-                        style={'marginTop': '10px'}
+                    html.Div(
+                        style={'flex': '1 1 300px'},
+                        children=[
+                            html.H2('Выберите пациента', style={'color': '#1f77b4'}),
+                            dcc.Dropdown(
+                                id='patient-dropdown',
+                                options=patient_options,
+                                placeholder='Выберите уникальную комбинацию возраста и пола',
+                                value=None,
+                                style={'marginTop': '10px'}
+                            )
+                        ]
+                    ),
+                    html.Button(
+                        'Выйти из системы',
+                        id='logout-button',
+                        n_clicks=0,
+                        style={
+                            'backgroundColor': '#d62728',
+                            'color': 'white',
+                            'border': 'none',
+                            'borderRadius': '6px',
+                            'padding': '12px 20px',
+                            'fontSize': '16px',
+                            'cursor': 'pointer'
+                        }
                     )
                 ]
             ),
@@ -115,27 +150,10 @@ def build_dashboard_container(patient_options, blood_parameter_options, default_
                     html.Div(id='patient-results', style={'marginBottom': '20px'}),
                     html.Div(
                         className='row',
-                        style={'display': 'flex', 'marginBottom': '20px'},
+                        style={'padding': '20px', 'backgroundColor': 'white', 'borderRadius': '8px', 'boxShadow': '2px 2px 10px #aaaaaa', 'marginBottom': '20px'},
                         children=[
-                            html.Div(
-                                style={'width': '25%', 'padding': '15px', 'backgroundColor': 'white', 'borderRadius': '8px', 'boxShadow': '2px 2px 10px #aaaaaa'},
-                                children=[
-                                    html.H3('Select Parameter for Box Plot', style={'textAlign': 'center', 'color': '#1f77b4'}),
-                                    dcc.Dropdown(
-                                        id='parameter-dropdown',
-                                        options=blood_parameter_options,
-                                        value=default_parameter,
-                                        clearable=False,
-                                        style={'marginTop': '10px'}
-                                    )
-                                ]
-                            ),
-                            html.Div(
-                                style={'width': '73%', 'marginLeft': '2%', 'backgroundColor': 'white', 'borderRadius': '8px', 'boxShadow': '2px 2px 10px #aaaaaa'},
-                                children=[
-                                    dcc.Graph(id='gender-box-plot', style={'height': '450px'})
-                                ]
-                            )
+                            html.H3(id='boxplot-title', style={'textAlign': 'center', 'color': '#1f77b4', 'width': '100%'}),
+                            dcc.Graph(id='gender-box-plot', style={'height': '450px', 'width': '100%'})
                         ]
                     ),
                     html.Div(
@@ -171,19 +189,34 @@ def register_dashboard_callbacks(app, df, source_column_map, blood_df):
         return patient_df.to_dict('records'), result_sections, {'display': 'block'}
 
     @app.callback(
+        Output('selected-metric', 'data'),
+        Input({'type': 'metric-card', 'metric': ALL}, 'n_clicks'),
+        State('selected-metric', 'data'),
+        prevent_initial_call=True
+    )
+    def set_selected_metric(clicks, current_metric):
+        if not ctx.triggered_id:
+            return no_update
+        metric = ctx.triggered_id.get('metric') if isinstance(ctx.triggered_id, dict) else None
+        if metric and metric in blood_df.columns:
+            return metric
+        return current_metric
+
+    @app.callback(
         Output('gender-box-plot', 'figure'),
-        Input('parameter-dropdown', 'value')
+        Output('boxplot-title', 'children'),
+        Input('selected-metric', 'data')
     )
     def update_box_plot(selected_parameter):
         if not selected_parameter or selected_parameter not in blood_df.columns:
             fig = px.box(template='plotly_white')
             fig.update_layout(title='Параметр недоступен в текущем наборе данных')
-            return fig
+            return fig, 'Выберите показатель, кликая по карточкам пациента — boxplot'
 
         if 'Gender' not in blood_df.columns:
             fig = px.box(template='plotly_white')
             fig.update_layout(title='Пол (Gender) отсутствует в наборе данных')
-            return fig
+            return fig, 'Boxplot недоступен: нет колонки Gender'
 
         fig = px.box(
             blood_df,
@@ -202,6 +235,7 @@ def register_dashboard_callbacks(app, df, source_column_map, blood_df):
             paper_bgcolor='white',
             showlegend=False
         )
-        return fig
+        header = f"Boxplot: {selected_parameter.replace('_', ' ')}"
+        return fig, header
 
     return app
