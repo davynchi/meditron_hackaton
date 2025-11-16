@@ -23,19 +23,26 @@ DATA_DIR = Path('data')
 SOURCE_COLUMN_MAP = {}
 
 
+def read_tabular_file(file_path: Path) -> pd.DataFrame:
+    if file_path.suffix.lower() == '.xlsx':
+        return pd.read_excel(file_path)
+    return pd.read_csv(file_path)
+
+
 def load_all_datasets(data_dir: Path):
     frames = []
     column_map = {}
     if data_dir.exists():
-        for csv_file in sorted(data_dir.glob('*.csv')):
-            try:
-                df_local = pd.read_csv(csv_file)
-            except Exception:
-                continue
+        for pattern in ('*.csv', '*.xlsx'):
+            for file_path in sorted(data_dir.glob(pattern)):
+                try:
+                    df_local = read_tabular_file(file_path)
+                except Exception:
+                    continue
 
-            column_map[csv_file.name] = df_local.columns.tolist()
-            df_local['Source_File'] = csv_file.name
-            frames.append(df_local)
+                column_map[file_path.name] = df_local.columns.tolist()
+                df_local['Source_File'] = file_path.name
+                frames.append(df_local)
 
     if not frames:
         raise FileNotFoundError("No CSV files found inside the 'data' directory.")
@@ -75,10 +82,18 @@ except FileNotFoundError as exc:
     print(f"Error: {exc}")
     exit()
 
-try:
-    blood_df = pd.read_csv(DATA_DIR / 'анализ_крови.csv').reset_index(drop=True)
-except FileNotFoundError:
-    print("Error: 'анализ_крови.csv' not found in the data directory.")
+blood_df = None
+for base_name in ('blood_count_dataset', 'анализ_крови'):
+    for ext in ('.csv', '.xlsx'):
+        candidate = DATA_DIR / f"{base_name}{ext}"
+        if candidate.exists():
+            blood_df = read_tabular_file(candidate).reset_index(drop=True)
+            break
+    if blood_df is not None:
+        break
+
+if blood_df is None:
+    print("Error: 'blood_count_dataset.(csv|xlsx)' or 'анализ_крови.(csv|xlsx)' not found in the data directory.")
     exit()
 
 df['Gender'] = df['Gender'].astype(str)
@@ -87,8 +102,11 @@ df['Age_Str'] = df['Age'].astype(str)
 df['Patient_Key'] = df['Age_Str'] + '|' + df['Gender_Norm']
 
 patient_options = build_patient_options(df)
-blood_parameter_options = [{'label': col.replace('_', ' '), 'value': col} for col in numerical_cols if col in blood_df.columns]
-default_parameter = blood_parameter_options[0]['value'] if blood_parameter_options else None
+if 'Hemoglobin' in blood_df.columns:
+    default_metric = 'Hemoglobin'
+else:
+    numeric_candidates = [col for col in numerical_cols if col in blood_df.columns]
+    default_metric = numeric_candidates[0] if numeric_candidates else blood_df.columns[0]
 global_scatter_fig = build_scatter_figure(blood_df)
 
 # initialize Dash
@@ -101,6 +119,7 @@ app.layout = html.Div(
     children=[
         dcc.Store(id='auth-store', data={'authorized': False}),
         dcc.Store(id='patient-data-store', data=[]),
+        dcc.Store(id='selected-metric', data=default_metric),
 
         # Registration/Login Block
         build_login_section(),
@@ -108,8 +127,6 @@ app.layout = html.Div(
         # Dashboard Block (hidden until login)
         build_dashboard_container(
             patient_options,
-            blood_parameter_options,
-            default_parameter,
             global_scatter_fig
         )
     ]

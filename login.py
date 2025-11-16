@@ -31,7 +31,7 @@ def build_login_section():
                         placeholder='Логин',
                         type='text',
                         style={
-                            'width': '100%',
+                            'width': 'calc(100% - 2px)',
                             'padding': '12px',
                             'marginTop': '15px',
                             'border': '1px solid #cccccc',
@@ -43,7 +43,7 @@ def build_login_section():
                         placeholder='Пароль',
                         type='password',
                         style={
-                            'width': '100%',
+                            'width': 'calc(100% - 2px)',
                             'padding': '12px',
                             'marginTop': '10px',
                             'border': '1px solid #cccccc',
@@ -107,5 +107,15 @@ def register_login_callbacks(app):
         }
         dashboard_style = {'display': 'block' if is_authorized else 'none'}
         return login_style, dashboard_style
+
+    @app.callback(
+        Output('auth-store', 'data', allow_duplicate=True),
+        Input('logout-button', 'n_clicks'),
+        prevent_initial_call=True
+    )
+    def handle_logout(n_clicks):
+        if n_clicks:
+            return {'authorized': False}
+        return no_update
 
     return app
