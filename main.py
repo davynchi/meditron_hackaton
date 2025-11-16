@@ -76,9 +76,9 @@ except FileNotFoundError as exc:
     exit()
 
 try:
-    blood_df = pd.read_csv(DATA_DIR / 'blood_count_dataset.csv').reset_index(drop=True)
+    blood_df = pd.read_csv(DATA_DIR / 'анализ_крови.csv').reset_index(drop=True)
 except FileNotFoundError:
-    print("Error: 'blood_count_dataset.csv' not found in the data directory.")
+    print("Error: 'анализ_крови.csv' not found in the data directory.")
     exit()
 
 df['Gender'] = df['Gender'].astype(str)
