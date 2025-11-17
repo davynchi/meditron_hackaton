@@ -1,6 +1,6 @@
 import pandas as pd
 import plotly.express as px
-from dash import dcc, html, Input, Output, State, ALL, no_update, ctx
+from dash import dcc, html, Input, Output, State, ALL, MATCH, no_update, ctx
 
 
 CARD_STYLE = {
@@ -14,6 +14,17 @@ CARD_STYLE = {
 }
 
 BLOOD_FILES = {'анализ_крови.csv', 'анализ_крови.xlsx'}
+URINE_FILES = {'анализ_мочи.csv', 'анализ_мочи.xlsx'}
+SOURCE_LABELS = {
+    'анализ_мочи.csv': 'Анализ мочи',
+    'анализ_мочи.xlsx': 'Анализ мочи',
+    'анализ_крови.csv': 'Биохимический анализ крови',
+    'анализ_крови.xlsx': 'Биохимический анализ крови'
+}
+REFERENCE_COLUMNS = {
+    'Гемоглобин': ('Гемоглобин мин норма', 'Гемоглобин макс норма'),
+    'Тромбоциты': ('Тромбоциты мин норма', 'Тромбоциты макс норма')
+}
 
 
 def _to_float(value):
@@ -125,6 +136,41 @@ def build_platelet_gauge(row):
     return build_range_gauge(row, 'Тромбоциты', 'Тромбоциты мин норма', 'Тромбоциты макс норма', 'Тромбоциты')
 
 
+def empty_gauge_figure(metric_name=''):
+    return {
+        'data': [],
+        'layout': {
+            'template': 'plotly_white',
+            'xaxis': {'title': 'Дата'},
+            'yaxis': {'title': metric_name},
+            'annotations': [{
+                'text': 'Пустой график',
+                'showarrow': False
+            }]
+        }
+    }
+
+
+def build_metric_gauge_block(row, row_identifier, metric_id, builder_func, source_name):
+    gauge_content = builder_func(row)
+    button_id = {'type': 'gauge-toggle', 'row': row_identifier, 'metric': metric_id, 'source': source_name}
+    graph_id = {'type': 'gauge-plot', 'row': row_identifier, 'metric': metric_id, 'source': source_name}
+
+    return html.Div([
+        html.Button(
+            gauge_content,
+            id=button_id,
+            n_clicks=0,
+            style={'background': 'transparent', 'border': 'none', 'padding': 0, 'width': '100%', 'cursor': 'pointer'}
+        ),
+        dcc.Graph(
+            id=graph_id,
+            figure=empty_gauge_figure(metric_id),
+            style={'display': 'none', 'height': 220, 'width': '50%', 'margin': '10px auto 0'}
+        )
+    ])
+
+
 def format_value(value):
     if pd.isna(value):
         return 'N/A'
@@ -167,17 +213,29 @@ def build_patient_result_sections(patient_df: pd.DataFrame, source_column_map):
         rows = []
         header_name = subset.iloc[0].get('Имя', 'Имя неизвестно')
         header_gender = subset.iloc[0].get('Пол', 'Пол неизвестен')
-        for _, row in subset.iterrows():
+        for row_idx, (_, row) in enumerate(subset.iterrows()):
             cards = []
             for column in display_columns:
                 if column not in subset.columns:
                     continue
+                card_style = CARD_STYLE.copy()
+                value_style = {'color': '#1f77b4', 'fontWeight': 'bold', 'margin': 0}
+                if column == 'Диагноз' and source_name in URINE_FILES:
+                    diagnosis = str(row[column]).strip().upper() if isinstance(row[column], str) else ''
+                    if diagnosis == 'POSITIVE':
+                        card_style['backgroundColor'] = '#ffe5e5'
+                        card_style['border'] = '2px solid #d62728'
+                        value_style['color'] = '#d62728'
+                    else:
+                        card_style['backgroundColor'] = '#e5ffe5'
+                        card_style['border'] = '2px solid #2ca02c'
+                        value_style['color'] = '#2ca02c'
                 cards.append(
                     html.Button(
                         html.Div([
                             html.H5(column.replace('_', ' '), style={'marginBottom': '4px', 'color': '#7f3f00'}),
-                            html.P(format_value(row[column]), style={'color': '#1f77b4', 'fontWeight': 'bold', 'margin': 0})
-                        ], style=CARD_STYLE),
+                            html.P(format_value(row[column]), style=value_style)
+                        ], style=card_style),
                         id={'type': 'metric-card', 'metric': column},
                         n_clicks=0,
                         style={'background': 'transparent', 'border': 'none', 'padding': 0, 'cursor': 'pointer'}
@@ -185,10 +243,15 @@ def build_patient_result_sections(patient_df: pd.DataFrame, source_column_map):
                 )
 
             date_value = row.get('Дата') or row.get('Date') or 'N/A'
-            detail_children = [html.Summary(f"{source_name} — {date_value}")]
+            detail_children = [html.Summary(f"{source_name} — {date_value}", style={'fontSize': '16px', 'fontWeight': '500'})]
+            row_identifier = f"{source_name}-{row_idx}"
             if source_name in BLOOD_FILES:
-                detail_children.append(build_hemoglobin_gauge(row))
-                detail_children.append(build_platelet_gauge(row))
+                detail_children.append(
+                    build_metric_gauge_block(row, row_identifier, 'Гемоглобин', build_hemoglobin_gauge, source_name)
+                )
+                detail_children.append(
+                    build_metric_gauge_block(row, row_identifier, 'Тромбоциты', build_platelet_gauge, source_name)
+                )
             detail_children.append(
                 html.Div(cards, style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '15px', 'marginTop': '10px'})
             )
@@ -201,6 +264,7 @@ def build_patient_result_sections(patient_df: pd.DataFrame, source_column_map):
                 )
             )
 
+        display_name = SOURCE_LABELS.get(source_name, source_name)
         sections.append(
             html.Div(
                 style={
@@ -212,12 +276,12 @@ def build_patient_result_sections(patient_df: pd.DataFrame, source_column_map):
                 },
                 children=[
                     html.H4(
-                        f"Источник: {source_name}",
+                        f"Источник: {display_name}",
                         style={'color': '#1f77b4', 'marginBottom': '5px'}
                     ),
                     html.P(
                         f"{header_name} — {header_gender}",
-                        style={'color': '#555555', 'marginBottom': '15px'}
+                        style={'color': '#555555', 'marginBottom': '15px', 'fontSize': '18px', 'fontWeight': '500'}
                     ),
                     html.Div(rows, style={'display': 'flex', 'flexDirection': 'column', 'gap': '10px'})
                 ]
@@ -331,6 +395,63 @@ def register_dashboard_callbacks(app, df, source_column_map, blood_df):
 
         result_sections = build_patient_result_sections(patient_df, source_column_map)
         return patient_df.to_dict('records'), result_sections, {'display': 'block'}
+
+    def _build_metric_history(records, source_name, metric_key):
+        fig = empty_gauge_figure(metric_key)
+        if not records:
+            return fig
+        df_local = pd.DataFrame(records)
+        if 'Source_File' not in df_local.columns:
+            return fig
+        df_local = df_local[df_local['Source_File'] == source_name]
+        if df_local.empty or metric_key not in df_local.columns:
+            return fig
+        date_col = 'Дата' if 'Дата' in df_local.columns else ('Date' if 'Date' in df_local.columns else None)
+        if date_col is None:
+            return fig
+        df_local = df_local.dropna(subset=[metric_key])
+        if df_local.empty:
+            return fig
+        df_local = df_local.sort_values(by=date_col)
+        fig_obj = px.line(df_local, x=date_col, y=metric_key, markers=True, template='plotly_white')
+        fig_obj.update_layout(title=f'{metric_key} во времени')
+
+        ref_cols = REFERENCE_COLUMNS.get(metric_key)
+        if ref_cols:
+            min_col, max_col = ref_cols
+            if min_col in df_local.columns and not df_local[min_col].dropna().empty:
+                fig_obj.add_scatter(
+                    x=df_local[date_col],
+                    y=df_local[min_col],
+                    mode='lines',
+                    name=f'{metric_key} мин норма',
+                    line={'color': '#d62728', 'dash': 'dot'}
+                )
+            if max_col in df_local.columns and not df_local[max_col].dropna().empty:
+                fig_obj.add_scatter(
+                    x=df_local[date_col],
+                    y=df_local[max_col],
+                    mode='lines',
+                    name=f'{metric_key} макс норма',
+                    line={'color': '#d62728', 'dash': 'dash'}
+                )
+        return fig_obj
+
+    @app.callback(
+        Output({'type': 'gauge-plot', 'row': MATCH, 'metric': MATCH, 'source': MATCH}, 'figure'),
+        Output({'type': 'gauge-plot', 'row': MATCH, 'metric': MATCH, 'source': MATCH}, 'style'),
+        Input({'type': 'gauge-toggle', 'row': MATCH, 'metric': MATCH, 'source': MATCH}, 'n_clicks'),
+        State('patient-data-store', 'data'),
+        State({'type': 'gauge-toggle', 'row': MATCH, 'metric': MATCH, 'source': MATCH}, 'id'),
+        prevent_initial_call=True
+    )
+    def toggle_gauge_plot(n_clicks, records, button_id):
+        shown = {'display': 'block', 'height': 220, 'width': '50%', 'margin': '10px auto 0'}
+        hidden = {'display': 'none', 'height': 220, 'width': '50%', 'margin': '10px auto 0'}
+        fig = _build_metric_history(records, button_id['source'], button_id['metric'])
+        if n_clicks and n_clicks % 2 == 1:
+            return fig, shown
+        return fig, hidden
 
     @app.callback(
         Output('selected-metric', 'data'),
