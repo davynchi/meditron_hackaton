@@ -84,3 +84,18 @@ bash scripts/deploy_docker.sh
 - Дополнительные сведения об архитектуре и ключевых алгоритмах: `docs/architecture.md`, `docs/main.md`, `docs/login.md`.
 - Конфигурационные файлы: `config/settings.yaml` (боевые параметры) и `config/settings.example.yaml` (шаблон).
 - Скрипты автоматизации расположены в `scripts/`: `run_local.sh` запускает приложение локально, `deploy_docker.sh` собирает и стартует Docker-образ.
+
+## Тесты
+
+- Базовые модульные проверки лежат в каталоге `tests/`.
+- Запуск тестов:
+
+```bash
+python -m pytest
+```
+
+или при использовании Poetry:
+
+```bash
+poetry run pytest
+```
