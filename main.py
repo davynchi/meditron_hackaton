@@ -15,8 +15,8 @@ from dashboard import (
 
 # List of numerical columns for the dropdown selection
 numerical_cols = [
-    'Hemoglobin', 'Platelet_Count', 'White_Blood_Cells',
-    'Red_Blood_Cells', 'MCV', 'MCH', 'MCHC'
+    'Гемоглобин', 'Тромбоциты', 'Лейкоциты',
+    'Эритроциты', 'СОЭ', 'Среднее содержание эритроцита', 'Средняя концентрация гемоглобина'
 ]
 
 DATA_DIR = Path('data')
@@ -26,7 +26,8 @@ SOURCE_COLUMN_MAP = {}
 def read_tabular_file(file_path: Path) -> pd.DataFrame:
     if file_path.suffix.lower() == '.xlsx':
         return pd.read_excel(file_path)
-    return pd.read_csv(file_path)
+    sep = ';' if 'анализ_крови' in file_path.name else ','
+    return pd.read_csv(file_path, sep=sep)
 
 
 def load_all_datasets(data_dir: Path):
@@ -52,7 +53,7 @@ def load_all_datasets(data_dir: Path):
 
 
 def build_scatter_figure(df_source: pd.DataFrame):
-    required_cols = {'Red_Blood_Cells', 'Hemoglobin', 'Gender', 'Age'}
+    required_cols = {'Эритроциты', 'Гемоглобин', 'Пол', 'Возраст'}
     if not required_cols.issubset(df_source.columns):
         fig = px.scatter(template='plotly_white')
         fig.update_layout(title='Загрузите анализы, чтобы построить диаграмму')
@@ -60,16 +61,16 @@ def build_scatter_figure(df_source: pd.DataFrame):
 
     fig = px.scatter(
         df_source,
-        x='Red_Blood_Cells',
-        y='Hemoglobin',
-        color='Gender',
-        size='Age',
-        hover_data=['Platelet_Count', 'White_Blood_Cells'] if {'Platelet_Count', 'White_Blood_Cells'}.issubset(df_source.columns) else None,
-        title='Correlation between Red Blood Cell Count and Hemoglobin',
+        x='Эритроциты',
+        y='Гемоглобин',
+        color='Пол',
+        size='Возраст',
+        hover_data=['Тромбоциты', 'Лейкоциты'] if {'Тромбоциты', 'Лейкоциты'}.issubset(df_source.columns) else None,
+        title='Correlation between кол-во эритроцитов and Гемоглобин',
         template='plotly_white'
     )
     fig.update_xaxes(title=r"$\text{Red Blood Cells } (10^6/\mu L)$")
-    fig.update_yaxes(title=r"$\text{Hemoglobin } (g/dL)$")
+    fig.update_yaxes(title=r"$\text{Гемоглобин } (g/dL)$")
     return fig
 
 
@@ -96,14 +97,14 @@ if blood_df is None:
     print("Error: 'blood_count_dataset.(csv|xlsx)' or 'анализ_крови.(csv|xlsx)' not found in the data directory.")
     exit()
 
-df['Gender'] = df['Gender'].astype(str)
-df['Gender_Norm'] = df['Gender'].str.lower().str.strip()
-df['Age_Str'] = df['Age'].astype(str)
-df['Patient_Key'] = df['Age_Str'] + '|' + df['Gender_Norm']
+df['Пол'] = df['Пол'].astype(str)
+df['Пол_Norm'] = df['Пол'].str.lower().str.strip()
+df['Возраст_Str'] = df['Возраст'].astype(str)
+df['Patient_Key'] = df['ID']
 
 patient_options = build_patient_options(df)
-if 'Hemoglobin' in blood_df.columns:
-    default_metric = 'Hemoglobin'
+if 'Гемоглобин' in blood_df.columns:
+    default_metric = 'Гемоглобин'
 else:
     numeric_candidates = [col for col in numerical_cols if col in blood_df.columns]
     default_metric = numeric_candidates[0] if numeric_candidates else blood_df.columns[0]
@@ -115,7 +116,7 @@ server = app.server
 
 # --- 3. Define the Layout ---
 app.layout = html.Div(
-    style={'backgroundColor': '#f5f5f5', 'padding': '20px', 'minHeight': '100vh'},
+    style={'backgroundColor': '#000000', 'padding': '20px', 'minHeight': '100vh'},
     children=[
         dcc.Store(id='auth-store', data={'authorized': False}),
         dcc.Store(id='patient-data-store', data=[]),
