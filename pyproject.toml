@@ -9,4 +9,5 @@ dependencies = [
     "docker>=7.1.0",
     "pandas>=2.3.3",
     "plotly>=6.4.0",
+    "pytest>=9.0.1",
 ]

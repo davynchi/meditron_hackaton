@@ -28,5 +28,5 @@ ENV PATH="/app/.venv/bin:${PATH}"
 # 4) Copy the rest of the project
 COPY . .
 
-# 5) Default command (change if you have a console script)
-CMD ["python", "main.py"]
+# 5) Default command (project entry point)
+CMD ["python", "-m", "src.main"]

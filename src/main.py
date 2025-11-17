@@ -4,8 +4,8 @@ import pandas as pd
 import plotly.express as px
 from dash import Dash, dcc, html
 
-from login import build_login_section, register_login_callbacks
-from dashboard import (
+from .login import build_login_section, register_login_callbacks
+from .dashboard import (
     build_patient_options,
     build_dashboard_container,
     register_dashboard_callbacks
@@ -24,6 +24,13 @@ SOURCE_COLUMN_MAP = {}
 
 
 def read_tabular_file(file_path: Path) -> pd.DataFrame:
+    """Load a single CSV/XLSX file and normalize delimiters.
+
+    `анализ_крови` выгружается с `;` — если импортировать его как обычный CSV,
+    медицинские значения «слипаются» в один столбец. Функция гарантирует,
+    что дальнейшие алгоритмы (индикаторы, графики) получают корректный
+    числовой DataFrame.
+    """
     if file_path.suffix.lower() == '.xlsx':
         return pd.read_excel(file_path)
     sep = ';' if 'анализ_крови' in file_path.name else ','
@@ -31,6 +38,14 @@ def read_tabular_file(file_path: Path) -> pd.DataFrame:
 
 
 def load_all_datasets(data_dir: Path):
+    """Aggregate все таблицы из каталога `data/`.
+
+    - Читает каждый CSV/XLSX.
+    - Добавляет `Source_File`, чтобы UI мог показать первичный источник.
+    - Нормализует имя столбца (Gender → Пол и т.п.) через `normalize_columns`.
+
+    Возвращает объединённый DataFrame и карту колонок для каждого файла.
+    """
     frames = []
     column_map = {}
     if data_dir.exists():
@@ -53,6 +68,12 @@ def load_all_datasets(data_dir: Path):
 
 
 def build_scatter_figure(df_source: pd.DataFrame):
+    """Build global scatter for медицинских показателей.
+
+    Поскольку scatter демонстрирует корреляцию эритроцитов и гемоглобина
+    по полу/возрасту, мы строго проверяем наличие необходимых колонок,
+    чтобы не вводить врача в заблуждение неполными графиками.
+    """
     required_cols = {'Эритроциты', 'Гемоглобин', 'Пол', 'Возраст'}
     if not required_cols.issubset(df_source.columns):
         fig = px.scatter(template='plotly_white')
