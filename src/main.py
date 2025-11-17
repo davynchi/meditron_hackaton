@@ -90,8 +90,8 @@ def build_scatter_figure(df_source: pd.DataFrame):
         title='Correlation between кол-во эритроцитов and Гемоглобин',
         template='plotly_white'
     )
-    fig.update_xaxes(title=r"$\text{Red Blood Cells } (10^6/\mu L)$")
-    fig.update_yaxes(title=r"$\text{Гемоглобин } (g/dL)$")
+    fig.update_xaxes(title=r"Эритроциты (10^6 mu / L)")
+    fig.update_yaxes(title=r"Гемоглобин (g/dL)")
     return fig
 
 
