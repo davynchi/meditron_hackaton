@@ -46,7 +46,7 @@
 Запуск:
 
 ```bash
-pytest
+python -m pytest
 ```
 
-Покрывают функции `build_patient_options` и `build_scatter_figure`.
+Покрывают функции проекта.
