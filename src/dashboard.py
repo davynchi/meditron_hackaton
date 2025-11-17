@@ -37,6 +37,14 @@ def _to_float(value):
 
 
 def build_range_gauge(row, value_key, min_key, max_key, title):
+    """Render a traffic-light style indicator for lab results.
+
+    Медицинские данные чувствительны, поэтому мы визуализируем их так,
+    чтобы врачу сразу был виден статус показателя относительно нормы.
+    Центральная зона (1/3–2/3 длины полосы) соответствует «норме»,
+    крайние трети — зонам риска. Значение нормализуется и
+    помещается в соответствующий сегмент.
+    """
     value = _to_float(row.get(value_key))
     min_norm = _to_float(row.get(min_key))
     max_norm = _to_float(row.get(max_key))
@@ -191,6 +199,13 @@ def build_patient_options(df_source: pd.DataFrame):
 
 
 def build_patient_result_sections(patient_df: pd.DataFrame, source_column_map):
+    """Собирает карточки показателей для всех таблиц выбранного пациента.
+
+    - Группируем строки по Source_File, чтобы врач видел первичный источник.
+    - Для каждого источника выводим имя/пол пациента, список исследований
+      и, при необходимости, специализированные визуализации (гемоглобин,
+      тромбоциты) с историческими графиками.
+    """
     if patient_df.empty:
         return html.P('Нет данных по выбранному пациенту.', style={'color': '#555555'})
 

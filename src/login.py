@@ -2,6 +2,12 @@ from dash import dcc, html, Input, Output, State, no_update
 
 
 def build_login_section():
+    """Return the login form layout.
+
+    Центральный блок авторизации позволяет ограничить доступ к
+    медицинским данным. Даже прототип должен явно показывать пользователю,
+    что данные защищены и видны только после подтверждения.
+    """
     return html.Div(
         id='login-container',
         style={
@@ -77,6 +83,12 @@ def build_login_section():
 
 
 def register_login_callbacks(app):
+    """Bind callbacks that обрабатывают вход/выход и показывают интерфейс.
+
+    Состояние авторизации хранится в `dcc.Store`. После успешного ввода
+    UI скрывает форму и отображает основное приложение. Коллбек logout
+    возвращает пользователя на экран входа, очищая чувствительные данные.
+    """
     @app.callback(
         Output('auth-store', 'data'),
         Output('login-feedback', 'children'),
